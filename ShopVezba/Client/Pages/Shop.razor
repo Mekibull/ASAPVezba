@@ -1,0 +1,147 @@
+﻿@page "/shop"
+@using Microsoft.AspNetCore.SignalR.Client;
+@inject NavigationManager NM
+@using ShopVezba.Shared;
+
+<h1 align="center">Prodavnica</h1>
+<b>@Poruka</b>
+
+<button @onclick="Test" disabled="@(!Konekcija)">Klikni me</button>
+<button @onclick="Salji">Posalji artikle u bazu</button>
+<button @onclick="Daj">Artikli</button>
+
+<h2 style="color: #2e6c80;">Odaberite Artikl:</h2>
+<div >
+    <ul>
+        @foreach (Artikl a in Artikli)
+        {
+            <li><button @onclick="(() => Odabir(a))">Izaberi</button>@a.Naziv</li>
+        }
+
+    </ul>
+</div>
+<div>
+    <button @onclick="Show">Kopra</button>
+</div>
+@if (pokazi == true)
+{
+<div >
+    <ul>
+        @foreach (Artikl a in korpa)
+        {
+        <li><button @onclick="(() => Ukloni(a))">Ukloni</button>@a.Naziv,@a.Cena</li>
+        }
+        <lf>
+                <p>Ukupna cena:@korpa.Sum(x=>x.Cena)</p>
+        </lf>
+    </ul>
+
+</div>
+}
+
+
+@code
+{
+
+    public double ukupnaCena;
+    public bool pokazi { get; set; } = false;
+    public string izabran { get; set; }
+    public List<Artikl> Artikli { get; set; } = new List<Artikl>();
+
+    public HubConnection KaHabu;
+    public HubConnection BazaHub;
+    private string Poruka { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        KaHabu = new HubConnectionBuilder().WithUrl(NM.ToAbsoluteUri("/sh")).Build();
+
+        BazaHub = new HubConnectionBuilder().WithUrl(NM.ToAbsoluteUri("/sh2")).Build();
+
+        BazaHub.On<List<Artikl>>("EvoArtikli", ListaA =>
+        {
+            Artikli = ListaA;
+            StateHasChanged();
+        });
+
+        await BazaHub.StartAsync();
+
+
+
+
+
+        KaHabu.On<string>("KlijentMetoda", poruka =>
+        {
+            Poruka = poruka;
+            StateHasChanged();
+
+        });
+
+        await KaHabu.StartAsync();
+
+    }
+    public bool Konekcija
+    {
+        get
+        {
+            return KaHabu.State == HubConnectionState.Connected;
+        }
+    }
+
+    Task Test()
+    {
+
+        return KaHabu.SendAsync("ProbnaMetoda");
+    }
+
+    Task Salji()
+    {
+        List<Artikl> la = new List<Artikl>();
+
+        la.Add(new Artikl("Paradajz",5, 50.00));
+        la.Add(new Artikl("Sir",3, 250.00));
+        la.Add(new Artikl("Jabuka",1, 20.00));
+        la.Add(new Artikl("Banana",1, 70.50));
+        la.Add(new Artikl("Hleb",1, 50.00));
+
+        return BazaHub.SendAsync("PrihvatiPodatke", la);
+    }
+
+    Task Daj()
+    {
+        return BazaHub.SendAsync("DajArtikle");
+    }
+
+    List<Artikl> korpa = new List<Artikl>();
+
+    public void Odabir(Artikl x)
+    {
+        korpa.Add(new Artikl(x.Naziv,x.Cena));
+
+    }
+
+    public void Ukloni(Artikl x)
+    {
+        korpa.Remove(x);
+    }
+
+    public void Show()
+    {
+
+        if (pokazi == true)
+        {
+            pokazi = false;
+        }
+        else
+            pokazi = true;
+    }
+
+
+
+
+
+
+
+
+
+}
